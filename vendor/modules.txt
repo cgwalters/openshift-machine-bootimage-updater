@@ -84,6 +84,13 @@ github.com/modern-go/concurrent
 github.com/modern-go/reflect2
 # github.com/opencontainers/runtime-spec v1.0.2
 ## explicit
+# github.com/openshift/api v0.0.0-20201204152819-09f84eef6831
+## explicit
+github.com/openshift/api/config/v1
+# github.com/openshift/client-go v0.0.0-20201120154203-dfba10361467
+## explicit
+github.com/openshift/client-go/config/clientset/versioned/scheme
+github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 # github.com/peterbourgon/diskv v2.0.1+incompatible
 ## explicit
 # github.com/sirupsen/logrus v1.7.0
@@ -162,7 +169,7 @@ google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/yaml.v2 v2.2.8
+# gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
 # k8s.io/api v0.19.4
 ## explicit
@@ -314,7 +321,7 @@ k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
 # k8s.io/klog v1.0.0
 ## explicit
-# k8s.io/klog/v2 v2.2.0
+# k8s.io/klog/v2 v2.3.0
 k8s.io/klog/v2
 # k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 ## explicit

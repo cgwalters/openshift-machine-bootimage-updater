@@ -1,5 +1,10 @@
 package main
 
+import (
+	"strings"
+	"encoding/json"
+)
+
 type rhcosBootimage struct {
 	AMIs map[string]struct {
 		HVM string `json:"hvm"`
@@ -192,3 +197,15 @@ var rhcos46 = `
     "ostree-version": "46.82.202011260640-0"
 }
 `
+
+func bootimageFromChannel(channel string) *rhcosBootimage {
+	var r rhcosBootimage
+	if strings.HasSuffix(channel, "-4.6") {
+		err := json.Unmarshal([]byte(rhcos46), &r)
+		if err != nil {
+			panic(err)
+		}
+		return &r
+	}
+	return nil
+}

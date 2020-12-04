@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 
+	openshiftv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	"github.com/coreos/ign-converter/translate/v24tov31"
 	"github.com/coreos/ignition/config/v2_4"
 	"github.com/stretchr/objx"
@@ -135,6 +136,24 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	configV1Client, err := openshiftv1.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+	cvs, err := configV1Client.ClusterVersions().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	cv := cvs.Items[0]
+	channel := cv.Spec.Channel
+	fmt.Printf("OpenShift channel: %s\n", channel)
+
+	newBootimage := bootimageFromChannel(channel)
+	if newBootimage == nil {
+		return fmt.Errorf("No updated bootimages known for channel %s", channel)
+	}
+
 	dc, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return err
@@ -189,7 +208,7 @@ func run(ctx context.Context) error {
 func main() {
 	err := run(context.TODO())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

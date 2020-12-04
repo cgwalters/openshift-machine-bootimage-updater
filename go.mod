@@ -12,6 +12,8 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
+	github.com/openshift/api v0.0.0-20201204152819-09f84eef6831 // indirect
+	github.com/openshift/client-go v0.0.0-20201120154203-dfba10361467
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/stretchr/objx v0.3.0
