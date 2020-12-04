@@ -17,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -33,6 +34,8 @@ const (
 	machineAPIGroup       = "machine.openshift.io"
 	machineSetOwningLabel = "machine.openshift.io/cluster-api-machineset"
 	machineLabelRole      = "machine.openshift.io/cluster-api-machine-role"
+
+	rhcosImages = "https://raw.githubusercontent.com/openshift/installer/release-4.6/data/data/rhcos.json"
 )
 
 var roles = []string{"master", "worker"}
@@ -152,8 +155,9 @@ func run(ctx context.Context) error {
 		return err
 	}
 	for _, ms := range objects(objx.Map(obj.UnstructuredContent()).Get("items")) {
+		udSelector := "spec.template.spec.providerSpec.value.ignition.userDataSecret"
 		name := (*ms.Get("metadata.name")).Data().(string)
-		curSecret := (*ms.Get("spec.template.spec.providerSpec.value.ignition.userDataSecret")).Data().(string)
+		curSecret := (*ms.Get(udSelector)).Data().(string)
 		labels := (*ms.Get("spec.template.metadata.labels")).Data().(map[string]interface{})
 		roleV, ok := labels[machineLabelRole]
 		if !ok {
@@ -163,14 +167,20 @@ func run(ctx context.Context) error {
 		role := roleV.(string)
 		target, ok := targetSecrets[role]
 		if !ok {
-			fmt.Printf("Skipping machineset %s with unhandled role %s\n", role)
+			fmt.Printf("Skipping machineset %s with unhandled role %s\n", name, role)
 			continue
 		}
-		if curSecret != target {
-
+		if curSecret == target {
+			fmt.Printf("machineset %s already uses %s\n", name, target)
+			continue
 		}
-		fmt.Printf("machineset %s uses %s\n", name, curSecret)
 
+		ms.Set(udSelector, target)
+		fmt.Printf("Updating machineset %s to use user-data secret %s\n", name, target)
+		v := unstructured.Unstructured {
+			Object: ms.Value().MSI(),
+		}
+		machineSetClient.Update(ctx, &v, metav1.UpdateOptions{})
 	}
 
 	return nil
