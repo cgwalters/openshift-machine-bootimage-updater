@@ -1,8 +1,9 @@
 package main
 
 import (
-	"strings"
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 type rhcosBootimage struct {
@@ -208,4 +209,8 @@ func bootimageFromChannel(channel string) *rhcosBootimage {
 		return &r
 	}
 	return nil
+}
+
+func getGCPImage(img *rhcosBootimage) string {
+	return fmt.Sprintf("projects/%s/global/images/%s", img.GCP.Project, img.GCP.Image)
 }

@@ -11,9 +11,10 @@ import (
 	"fmt"
 	"os"
 
-	openshiftv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	"github.com/coreos/ign-converter/translate/v24tov31"
 	"github.com/coreos/ignition/config/v2_4"
+	openshiftv1config "github.com/openshift/api/config/v1"
+	openshiftv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 	"github.com/stretchr/objx"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -154,6 +155,20 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("No updated bootimages known for channel %s", channel)
 	}
 
+	infras, err := configV1Client.Infrastructures().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	pt := infras.Items[0].Spec.PlatformSpec.Type
+	switch pt {
+	case openshiftv1config.GCPPlatformType:
+		break
+	case openshiftv1config.AWSPlatformType:
+		break
+	default:
+		return fmt.Errorf("Unhandled platform %s", pt)
+	}
+
 	dc, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return err
@@ -174,9 +189,10 @@ func run(ctx context.Context) error {
 		return err
 	}
 	for _, ms := range objects(objx.Map(obj.UnstructuredContent()).Get("items")) {
-		udSelector := "spec.template.spec.providerSpec.value.ignition.userDataSecret"
+		providerSpecQuery := "spec.template.spec.providerSpec.value."
+		udSelector := "userDataSecret.name"
 		name := (*ms.Get("metadata.name")).Data().(string)
-		curSecret := (*ms.Get(udSelector)).Data().(string)
+		curSecret := (ms.Get(providerSpecQuery + udSelector)).Data().(string)
 		labels := (*ms.Get("spec.template.metadata.labels")).Data().(map[string]interface{})
 		roleV, ok := labels[machineLabelRole]
 		if !ok {
@@ -189,14 +205,68 @@ func run(ctx context.Context) error {
 			fmt.Printf("Skipping machineset %s with unhandled role %s\n", name, role)
 			continue
 		}
-		if curSecret == target {
-			fmt.Printf("machineset %s already uses %s\n", name, target)
+
+		changed := false
+
+		if curSecret != target {
+			ms.Set(providerSpecQuery+udSelector, target)
+			fmt.Printf("Updating machineset %s to use user-data secret %s\n", name, target)
+			changed = true
+		}
+
+		pt := infras.Items[0].Spec.PlatformSpec.Type
+		switch pt {
+		case openshiftv1config.AWSPlatformType:
+			region := ms.Get(providerSpecQuery + "placement.region").Data().(string)
+			currentAmi := ms.Get(providerSpecQuery + "ami.id").Data().(string)
+			newAmiV, ok := newBootimage.AMIs[region]
+			if !ok {
+				return fmt.Errorf("No bootimage in region %s for machineset %s", region, name)
+			}
+			newAmi := newAmiV.HVM
+			if newAmi != currentAmi {
+				changed = true
+				fmt.Printf("machineset/%s: Updating to use AMI %s\n", name, newAmi)
+				ms.Set(providerSpecQuery+"ami.id", newAmi)
+			}
+			break
+		case openshiftv1config.GCPPlatformType:
+			disks := ms.Get(providerSpecQuery + "disks").ObjxMapSlice()
+			if disks == nil {
+				return fmt.Errorf("Failed to find disks in machineset %s", name)
+			}
+			foundBootDisk := false
+			for _, disk := range disks {
+				if !disk.Get("boot").Bool() {
+					continue
+				}
+				prevImage, ok := disk["image"]
+				if !ok || prevImage == "" {
+					return fmt.Errorf("Failed to find image key in machineset %s", name)
+				}
+				targetImage := getGCPImage(newBootimage)
+				if prevImage != targetImage {
+					changed = true
+					disk["image"] = targetImage
+					fmt.Printf("machineset/%s: updating to use image %s\n", name, targetImage)
+				}
+				foundBootDisk = true
+			}
+			if !foundBootDisk {
+				return fmt.Errorf("Failed to find boot disk for machineset/%s", name)
+			}
+
+			break
+		default:
+			panic(fmt.Sprintf("Unhandled platform type %s", pt))
+		}
+
+		if !changed {
+			fmt.Printf("machineset/%s: already updated\n", name)
 			continue
 		}
 
-		ms.Set(udSelector, target)
-		fmt.Printf("Updating machineset %s to use user-data secret %s\n", name, target)
-		v := unstructured.Unstructured {
+		v := unstructured.Unstructured{
 			Object: ms.Value().MSI(),
 		}
 		machineSetClient.Update(ctx, &v, metav1.UpdateOptions{})
