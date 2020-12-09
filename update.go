@@ -214,7 +214,7 @@ func run(ctx context.Context) error {
 			changed = true
 		}
 
-		pt := infras.Items[0].Spec.PlatformSpec.Type
+		pt := infras.Items[0].Status.PlatformStatus.Type
 		switch pt {
 		case openshiftv1config.AWSPlatformType:
 			region := ms.Get(providerSpecQuery + "placement.region").Data().(string)
