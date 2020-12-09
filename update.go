@@ -159,14 +159,14 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	pt := infras.Items[0].Spec.PlatformSpec.Type
+	pt := infras.Items[0].Status.PlatformStatus.Type
 	switch pt {
 	case openshiftv1config.GCPPlatformType:
 		break
 	case openshiftv1config.AWSPlatformType:
 		break
 	default:
-		return fmt.Errorf("Unhandled platform %s", pt)
+		return fmt.Errorf("Unhandled platform %v", pt)
 	}
 
 	dc, err := dynamic.NewForConfig(config)
